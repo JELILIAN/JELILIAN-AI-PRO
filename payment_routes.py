@@ -570,7 +570,7 @@ def add_payment_routes(app):
             
             <div class="payment-qr-container">
                 <div class="qr-display">
-                    <img src="/assets/qr_codes/wechat_pay.png" alt="聚合支付二维码" class="payment-qr-code">
+                    <img src="/assets/qr_codes/alipay_pay.png" alt="支付宝收款码" class="payment-qr-code">
                 </div>
                 
                 <div class="payment-info">
