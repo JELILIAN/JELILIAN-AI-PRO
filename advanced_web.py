@@ -92,6 +92,18 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
     t = lambda key: get_text(key, current_lang)
     lang_selector = get_language_selector_html(current_lang)
     
+    # 示例提示词（根据语言）
+    example_prompts_dict = {
+        "zh": ["请用Python写一个计算器程序", "请帮我分析一下当前AI技术的发展趋势", "请为我的项目写一份README文档", "请解释一下机器学习的基本概念"],
+        "en": ["Please write a calculator program in Python", "Please analyze the current AI technology trends", "Please write a README document for my project", "Please explain the basic concepts of machine learning"],
+        "ja": ["Pythonで電卓プログラムを書いてください", "現在のAI技術のトレンドを分析してください", "プロジェクトのREADMEドキュメントを書いてください", "機械学習の基本概念を説明してください"],
+        "ko": ["Python으로 계산기 프로그램을 작성해주세요", "현재 AI 기술 동향을 분석해주세요", "프로젝트의 README 문서를 작성해주세요", "머신러닝의 기본 개념을 설명해주세요"],
+        "es": ["Por favor escribe un programa de calculadora en Python", "Por favor analiza las tendencias actuales de la tecnología IA", "Por favor escribe un documento README para mi proyecto", "Por favor explica los conceptos básicos del aprendizaje automático"],
+        "fr": ["Veuillez écrire un programme de calculatrice en Python", "Veuillez analyser les tendances actuelles de la technologie IA", "Veuillez écrire un document README pour mon projet", "Veuillez expliquer les concepts de base de l'apprentissage automatique"],
+        "de": ["Bitte schreiben Sie ein Taschenrechner-Programm in Python", "Bitte analysieren Sie die aktuellen KI-Technologietrends", "Bitte schreiben Sie ein README-Dokument für mein Projekt", "Bitte erklären Sie die Grundkonzepte des maschinellen Lernens"]
+    }
+    example_prompts = example_prompts_dict.get(current_lang, example_prompts_dict["en"])
+    
     user_info = ""
     nav_buttons = ""
     
@@ -633,10 +645,10 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
         
         <div class="examples">
             <h3>{t("example_questions")}</h3>
-            <span class="example-btn" onclick="setPrompt('Please write a calculator program in Python')">{t("example_coding")}</span>
-            <span class="example-btn" onclick="setPrompt('Please analyze the current AI technology trends')">{t("example_analysis")}</span>
-            <span class="example-btn" onclick="setPrompt('Please write a README document for my project')">{t("example_writing")}</span>
-            <span class="example-btn" onclick="setPrompt('Please explain the basic concepts of machine learning')">{t("example_qa")}</span>
+            <span class="example-btn" onclick="setPrompt('{example_prompts[0]}')">{t("example_coding")}</span>
+            <span class="example-btn" onclick="setPrompt('{example_prompts[1]}')">{t("example_analysis")}</span>
+            <span class="example-btn" onclick="setPrompt('{example_prompts[2]}')">{t("example_writing")}</span>
+            <span class="example-btn" onclick="setPrompt('{example_prompts[3]}')">{t("example_qa")}</span>
         </div>
     </div>
     
