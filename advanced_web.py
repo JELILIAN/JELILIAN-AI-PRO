@@ -793,10 +793,6 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
                         'Content-Type': 'application/json',
                     }},
                     body: JSON.stringify({{ prompt: prompt, model: selectedModel }})
-                    headers: {{
-                        'Content-Type': 'application/json',
-                    }},
-                    body: JSON.stringify({{ prompt: prompt }})
                 }});
                 
                 if (!response.ok) {{
