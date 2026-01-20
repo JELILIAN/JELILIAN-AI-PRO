@@ -10,11 +10,46 @@ import uvicorn
 import sys
 import json
 import asyncio
+import httpx
 from typing import Optional, Dict
 from user_manager import user_manager
 from translations import get_text, get_all_translations, SUPPORTED_LANGUAGES
 
 sys.path.insert(0, '.')
+
+# 千问API配置
+QWEN_API_KEY = "sk-ba31b180effe4134a4c3fc9c4f3a12a3"
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+# 可用模型列表
+AVAILABLE_MODELS = {
+    "qwen-turbo": {"name": "千问Turbo (快速)", "description": "响应快速，适合日常对话"},
+    "qwen-plus": {"name": "千问Plus (推荐)", "description": "平衡性能与质量"},
+    "qwen-max": {"name": "千问Max (高级)", "description": "最强性能，复杂任务"},
+}
+
+async def call_qwen_api(prompt: str, model: str = "qwen-plus") -> str:
+    """直接调用千问API"""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            f"{QWEN_BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {QWEN_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 4096,
+                "temperature": 0.7
+            }
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"API调用失败: {response.text}")
+        
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
 
 app = FastAPI(title="JELILIAN AI PRO")
 
@@ -516,6 +551,35 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
             background: #667eea; 
             color: white; 
         }}
+        .form-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }}
+        .model-selector {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        .model-selector label {{
+            margin: 0;
+            font-size: 14px;
+        }}
+        .model-selector select {{
+            padding: 8px 15px;
+            border: 2px solid #667eea;
+            border-radius: 20px;
+            background: white;
+            color: #667eea;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+        }}
+        .model-selector select:hover {{
+            background: #667eea;
+            color: white;
+        }}
         .upgrade-prompt, .trial-ended {{
             background: linear-gradient(45deg, #ff6b6b, #ffa500);
             color: white;
@@ -637,8 +701,18 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
             </div>
             
             <form class="chat-form" id="chatForm">
-                <label for="prompt">💬 {t("input_placeholder").split("...")[0]}:</label>
-                <textarea name="prompt" id="prompt" placeholder="{t("input_placeholder")}" required></textarea>
+                <div class="form-row">
+                    <label for="prompt">💬 {t("input_placeholder").split("...")[0]}:</label>
+                    <div class="model-selector">
+                        <label for="modelSelect">🤖 模型:</label>
+                        <select id="modelSelect">
+                            <option value="qwen-turbo">千问Turbo (快速)</option>
+                            <option value="qwen-plus" selected>千问Plus (推荐)</option>
+                            <option value="qwen-max">千问Max (高级)</option>
+                        </select>
+                    </div>
+                </div>
+                <textarea name="prompt" id="prompt" placeholder="{t("input_placeholder")} (按Enter发送，Shift+Enter换行)" required></textarea>
                 <button type="submit" class="btn" id="sendBtn">{t("send_message")}</button>
             </form>
         </div>
@@ -684,6 +758,14 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
             document.getElementById('typingIndicator').classList.remove('show');
         }}
         
+        // 回车发送功能
+        document.getElementById('prompt').addEventListener('keydown', function(e) {{
+            if (e.key === 'Enter' && !e.shiftKey) {{
+                e.preventDefault();
+                document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+            }}
+        }});
+        
         document.getElementById('chatForm').addEventListener('submit', async function(e) {{
             e.preventDefault();
             
@@ -691,6 +773,9 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
             if (!prompt) return;
             
             const sendBtn = document.getElementById('sendBtn');
+            const modelSelect = document.getElementById('modelSelect');
+            const selectedModel = modelSelect.value;
+            
             sendBtn.disabled = true;
             sendBtn.textContent = '...';
             
@@ -704,6 +789,10 @@ async def home(request: Request, lang: Optional[str] = Query(default=None), curr
             try {{
                 const response = await fetch('/api/chat', {{
                     method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                    }},
+                    body: JSON.stringify({{ prompt: prompt, model: selectedModel }})
                     headers: {{
                         'Content-Type': 'application/json',
                     }},
@@ -1007,28 +1096,25 @@ async def api_chat(request: Request):
                     # 扣除积分
                     credit_manager.use_credits(user_id, credit_cost)
                 
-                # 调用AI系统（所有可以对话的用户）
-                from app.llm import LLM
-                from autogen_system import autogen_system
+                # 获取用户选择的模型
+                selected_model = body.get("model", "qwen-plus")
+                if selected_model not in AVAILABLE_MODELS:
+                    selected_model = "qwen-plus"
                 
-                # 根据用户等级选择不同的AI处理方式
-                if subscription == 'free':
-                    # 免费用户：基础AI对话
-                    llm = LLM()
-                    response = await llm.ask([{"role": "user", "content": prompt}])
-                    final_response = response
-                elif subscription == 'basic':
-                    # 基础版用户：多智能体协作（3个智能体）
-                    result = await autogen_system.process_with_multi_agents(prompt, ['analyst', 'creative', 'technical'])
-                    final_response = result['final_response']
-                elif subscription == 'pro':
-                    # 专业版用户：完整多智能体协作（5个智能体）+ 深度分析
-                    result = await autogen_system.process_with_multi_agents(prompt, ['analyst', 'creative', 'technical', 'product', 'coordinator'])
-                    final_response = "🔥 **专业版深度分析**\n\n" + result['final_response'] + "\n\n📊 **多智能体协作报告**\n本次分析由" + str(len(result.get('agents_used', []))) + "个专业智能体协作完成，为您提供全方位的专业建议。"
-                elif subscription == 'custom':
-                    # 自定义版用户：最高级处理 + 专属功能
-                    result = await autogen_system.process_with_multi_agents(prompt, ['analyst', 'creative', 'technical', 'product', 'coordinator'])
-                    final_response = "💎 **自定义版专属服务**\n\n" + result['final_response'] + "\n\n🎯 **企业级分析报告**\n本次分析采用最高级AI处理流程，由专业智能体团队为您量身定制解决方案。\n\n📞 **专属客服支持**: 如需进一步咨询，请联系您的专属客服。"
+                # 直接调用千问API（所有可以对话的用户）
+                try:
+                    final_response = await call_qwen_api(prompt, selected_model)
+                    
+                    # 根据订阅等级添加额外信息
+                    if subscription == 'basic':
+                        final_response = final_response + "\n\n---\n💼 *基础版用户专享服务*"
+                    elif subscription == 'pro':
+                        final_response = "🔥 **专业版深度分析**\n\n" + final_response + "\n\n---\n📊 *专业版用户专享：优先响应、深度分析*"
+                    elif subscription == 'custom':
+                        final_response = "💎 **自定义版专属服务**\n\n" + final_response + "\n\n---\n🎯 *企业级专属服务*\n📞 专属客服: 18501935068"
+                except Exception as api_error:
+                    yield f"data: {json.dumps({'error': f'AI服务暂时不可用: {str(api_error)}'})}\n\n"
+                    return
                 
                 # 模拟流式输出效果
                 words = final_response.split()
@@ -1042,11 +1128,8 @@ async def api_chat(request: Request):
                     can_continue = trial_manager.increment_trial_chat(user_id)
                     
                     if not trial_manager.can_chat(user_id):
-                        # 生成智能推荐
-                        recommendations = await autogen_system.get_smart_recommendations([
-                            {'role': 'user', 'content': prompt},
-                            {'role': 'assistant', 'content': final_response}
-                        ])
+                        # 简单推荐
+                        recommendations = ['如何提高工作效率？', '学习编程的建议', 'AI技术的未来发展']
                         
                         # 发送试用结束提示和推荐
                         upgrade_msg = {
@@ -1054,8 +1137,8 @@ async def api_chat(request: Request):
                             'message': '🎉 感谢体验JELILIAN AI PRO！您的免费试用已结束。',
                             'upgrade_info': '升级到付费版本即可享受：',
                             'features': [
-                                '基础版 $20/月 - 多智能体协作，4,000积分/月',
-                                '专业版 $50/月 - 深度分析，40,000积分/月，50%折扣',
+                                '基础版 $20/月 - 4,000积分/月',
+                                '专业版 $50/月 - 40,000积分/月，50%折扣',
                                 '自定义版 - 企业级服务，专属客服，70%折扣',
                                 '无限AI对话，优先技术支持'
                             ],
