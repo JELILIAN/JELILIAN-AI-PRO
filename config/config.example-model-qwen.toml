@@ -1,0 +1,24 @@
+# 千问(Qwen) API 配置
+# Global LLM configuration for Qwen
+[llm]
+model = "qwen-plus"                                    # 千问模型，可选: qwen-plus, qwen-turbo, qwen-max 等
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"  # 千问兼容OpenAI格式的API端点
+api_key = "sk-ba31b180effe4134a4c3fc9c4f3a12a3"       # 您的千问API密钥
+max_tokens = 8192                                      # 最大token数
+temperature = 0.0                                      # 控制随机性
+
+# Optional configuration for vision model
+[llm.vision]
+model = "qwen-vl-plus"                                 # 千问视觉模型
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+api_key = "sk-ba31b180effe4134a4c3fc9c4f3a12a3"       # 您的千问API密钥
+max_tokens = 8192
+temperature = 0.0
+
+# MCP (Model Context Protocol) configuration
+[mcp]
+server_reference = "app.mcp.server"
+
+# Optional Runflow configuration
+[runflow]
+use_data_analysis_agent = false
